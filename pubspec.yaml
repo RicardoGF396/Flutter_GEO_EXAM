@@ -4,11 +4,18 @@ publish_to: 'none'
 version: 0.1.0
 
 environment:
-  sdk: '>=2.19.6 <3.0.0'
+  sdk: '2.19.5'
 
 dependencies:
   flutter:
     sdk: flutter
+  flutter_map: ^3.1.0
+  latlong2: ^0.8.1
+  http: ^0.13.0
+  flutter_map_geojson: ^1.0.0
+  cupertino_icons: ^1.0.2
+  google_maps_flutter: ^2.2.6
+  flutter_polyline_points: ^1.0.0
 
 dev_dependencies:
   flutter_test:
@@ -17,3 +24,5 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/
