@@ -9,10 +9,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  flutter_map: ^3.1.0
   latlong2: ^0.8.1
-  http: ^0.13.0
-  flutter_map_geojson: ^1.0.0
   cupertino_icons: ^1.0.2
   google_maps_flutter: ^2.2.6
   flutter_polyline_points: ^1.0.0

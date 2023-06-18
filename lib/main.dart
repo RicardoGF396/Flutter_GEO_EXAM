@@ -1,10 +1,11 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:geo_flutter_exam/location_service.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter/services.dart';
+import 'dart:ui' as ui;
 
-void main() {
-  runApp(const MyApp());
-}
+void main() => runApp(const MyApp());
 
 class MyApp extends StatelessWidget {
   const MyApp({Key? key}) : super(key: key);
@@ -31,35 +32,92 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  TextEditingController _coordinatesController = TextEditingController();
-  bool _showInfoBox = false;
+  final Completer<GoogleMapController> _controller =
+      Completer<GoogleMapController>();
+  final TextEditingController _searchController = TextEditingController();
+  final Set<Marker> _markers = <Marker>{};
+  final Set<Polygon> _polygons = <Polygon>{};
+  final List<LatLng> _polygonLatLngs = <LatLng>[];
+  int _polygonIdCounter = 1;
+  static const CameraPosition _kOrigin = CameraPosition(
+    target: LatLng(21.1220208, -101.683534),
+    zoom: 12,
+  );
 
-  void _searchCoordinates() {
-    // Get the coordinates from the text field and perform the search
-    String coordinates = _coordinatesController.text;
-    // Perform your search operation here using the coordinates
-    print('Searching coordinates: $coordinates');
+  @override
+  void initState() {
+    super.initState();
   }
+
+  Future<BitmapDescriptor> _createMarkerImageFromAsset(
+      BuildContext context) async {
+    final ImageConfiguration imageConfiguration =
+        createLocalImageConfiguration(context, size: Size.square(50));
+
+    final ByteData byteData = await rootBundle.load('assets/beer-icon.png');
+    final Uint8List pngBytes = byteData.buffer.asUint8List();
+
+    final ui.Codec codec = await ui.instantiateImageCodec(pngBytes,
+        targetHeight: 120, targetWidth: 60);
+    final ui.FrameInfo frameInfo = await codec.getNextFrame();
+
+    final ui.Image image = frameInfo.image;
+    final ByteData? resizedByteData =
+        await image.toByteData(format: ui.ImageByteFormat.png);
+    final Uint8List resizedPngBytes = resizedByteData!.buffer.asUint8List();
+
+    final BitmapDescriptor resizedBitmapDescriptor =
+        BitmapDescriptor.fromBytes(resizedPngBytes);
+
+    return resizedBitmapDescriptor;
+  }
+
+  void _setMarker(LatLng point) async {
+    final BitmapDescriptor markerImage =
+        await _createMarkerImageFromAsset(context);
+    setState(() {
+      _markers.add(
+        Marker(
+          markerId: const MarkerId('marker'),
+          position: point,
+          icon: markerImage,
+        ),
+      );
+    });
+  }
+
+  void _setPolygon() {
+    final String polygonIdVal = 'polygon_$_polygonIdCounter';
+    _polygonIdCounter++;
+    _polygons.add(Polygon(
+      polygonId: PolygonId(polygonIdVal),
+      points: _polygonLatLngs,
+      strokeWidth: 2,
+      fillColor: Colors.transparent,
+    ));
+  }
+
+  bool _showInfoBox = false;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Stack(
         children: [
-          FlutterMap(
-            mapController: MapController(),
-            options: MapOptions(
-              center: LatLng(
-                  21.12413566328141, -101.6859289619005), //León Guanajuato
-              zoom: 10.0,
-            ),
-            children: [
-              TileLayer(
-                urlTemplate:
-                    'http://mt0.google.com/vt/lyrs=m&hl=en&x={x}&y={y}&z={z}',
-                subdomains: const ['a', 'b', 'c'],
-              ),
-            ],
+          GoogleMap(
+            mapType: MapType.normal,
+            markers: _markers,
+            polygons: _polygons,
+            initialCameraPosition: _kOrigin,
+            onMapCreated: (GoogleMapController controller) {
+              _controller.complete(controller);
+            },
+            onTap: (point) {
+              setState(() {
+                _polygonLatLngs.add(point);
+                _setPolygon();
+              });
+            },
           ),
           Positioned(
             top: 40,
@@ -105,18 +163,25 @@ class _MyHomePageState extends State<MyHomePage> {
                       ),
                     ),
                     SizedBox(height: 10),
-                    TextField(
-                      controller: _coordinatesController,
-                      decoration: InputDecoration(
-                        labelText: 'Coordinates',
-                        hintText: 'Enter coordinates',
+                    TextFormField(
+                      controller: _searchController,
+                      textCapitalization: TextCapitalization.words,
+                      decoration: const InputDecoration(
+                        hintText: 'Escribe una locación',
                       ),
+                      onChanged: (value) {
+                        print(value);
+                      },
                     ),
                     SizedBox(height: 10),
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
-                        onPressed: _searchCoordinates,
+                        onPressed: () async {
+                          var place = await LocationService()
+                              .getPlace(_searchController.text);
+                          _goToPlace(place);
+                        },
                         style: ElevatedButton.styleFrom(
                           primary: Colors.black,
                           onPrimary: Colors.white,
@@ -170,5 +235,17 @@ class _MyHomePageState extends State<MyHomePage> {
         ],
       ),
     );
+  }
+
+  Future<void> _goToPlace(Map<String, dynamic> place) async {
+    final double lat = place['geometry']['location']['lat'];
+    final double lng = place['geometry']['location']['lng'];
+    final GoogleMapController controller = await _controller.future;
+    CameraPosition kPlaceCameraPosition =
+        CameraPosition(target: LatLng(lat, lng), zoom: 12);
+    controller.animateCamera(CameraUpdate.newCameraPosition(
+      kPlaceCameraPosition,
+    ));
+    _setMarker(LatLng(lat, lng));
   }
 }
