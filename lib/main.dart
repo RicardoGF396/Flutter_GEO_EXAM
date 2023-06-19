@@ -128,20 +128,20 @@ class _MyHomePageState extends State<MyHomePage> {
   void _setPolygon() async {
     await setSucursals();
     _polygonLatLngs.addAll(<LatLng>[
-      const LatLng(20.9127915, -100.7445553),
-      const LatLng(21.1516268, -100.9481036),
-      const LatLng(21.1234883, -101.6927539),
-      const LatLng(20.5280556, -100.8176046)
+      const LatLng(20.894454, -100.678923),
+      const LatLng(21.243964, -100.864543),
+      const LatLng(21.188806, -101.791105),
+      const LatLng(20.402177, -100.765260)
     ]);
     final String polygonIdVal = 'polygon_$_polygonIdCounter';
-    _polygonIdCounter++;
-    _polygons.add(Polygon(
-      polygonId: PolygonId(polygonIdVal),
-      points: _polygonLatLngs,
-      strokeWidth: 2,
-      fillColor: Colors.transparent,
-    ));
-  }
+    //_polygonIdCounter++;
+   _polygons.add(Polygon(
+    polygonId: PolygonId(polygonIdVal),
+    points: _polygonLatLngs,
+    strokeWidth: 2,
+     fillColor: Color.fromRGBO(18, 99, 18, 0.494), // Cambio realizado: se establece el color verde
+  ));
+}
 
   List<Map<dynamic, dynamic>> branches = [
     <dynamic, dynamic>{},
@@ -151,7 +151,7 @@ class _MyHomePageState extends State<MyHomePage> {
   getBranches() async {
     //const response = await fetch("http://ip:4005/api/branches/all");
     var response =
-        await http.get(Uri.parse("http://192.168.1.68:4005/api/branches/all"));
+        await http.get(Uri.parse("http://172.18.69.153:4005/api/branches/all"));
     var jsonData = await response.body;
     var json = convert.jsonDecode(jsonData);
     print("JSON: ${json['features']}");
@@ -198,12 +198,6 @@ class _MyHomePageState extends State<MyHomePage> {
             initialCameraPosition: _kOrigin,
             onMapCreated: (GoogleMapController controller) {
               _controller.complete(controller);
-            },
-            onTap: (point) {
-              setState(() {
-                _polygonLatLngs.add(point);
-                _setPolygon();
-              });
             },
           ),
           Positioned(
