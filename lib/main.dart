@@ -63,14 +63,14 @@ class _MyHomePageState extends State<MyHomePage> {
         .asUint8List();
   }
 
-  void setCustomMarkerIcon() async {
+  Future <void> setCustomMarkerIcon() async {
     Uint8List markerIcon = await getBytesFromAsset('assets/person.png', 100);
 
     // BitmapDescriptor.fromBytes(markerIcon);
     currentLocationIcon = BitmapDescriptor.fromBytes(markerIcon);
   }
 
-  void setCustomSucursalIcon() async {
+  Future <void> setCustomSucursalIcon() async {
     Uint8List sucursalIcon =
         await getBytesFromAsset('assets/beer-icon.png', 50);
     allSucursalsIcon = BitmapDescriptor.fromBytes(sucursalIcon);
@@ -149,6 +149,8 @@ class _MyHomePageState extends State<MyHomePage> {
   ];
   // gets all branches from the local API
   getBranches() async {
+    await setCustomSucursalIcon();
+    await setCustomMarkerIcon();
     //const response = await fetch("http://ip:4005/api/branches/all");
     var response =
         await http.get(Uri.parse("http://192.168.1.68:4005/api/branches/all"));
