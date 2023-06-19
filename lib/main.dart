@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:geo_flutter_exam/location_service.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert' as convert;
 import 'dart:ui' as ui;
 
 void main() => runApp(const MyApp());
@@ -38,15 +40,52 @@ class _MyHomePageState extends State<MyHomePage> {
   final Set<Marker> _markers = <Marker>{};
   final Set<Polygon> _polygons = <Polygon>{};
   final List<LatLng> _polygonLatLngs = <LatLng>[];
+  int _markerIdCounter = 1;
   int _polygonIdCounter = 1;
   static const CameraPosition _kOrigin = CameraPosition(
-    target: LatLng(21.1220208, -101.683534),
-    zoom: 12,
+    //target: LatLng(21.1220208, -101.683534),
+    //zoom: 12,
+    target: LatLng(20.873929, -101.225515),
+    zoom: 9,
   );
+
+  // Custom icon start
+  BitmapDescriptor currentLocationIcon = BitmapDescriptor.defaultMarker;
+  BitmapDescriptor allSucursalsIcon = BitmapDescriptor.defaultMarker;
+
+  Future<Uint8List> getBytesFromAsset(String path, int width) async {
+    ByteData data = await rootBundle.load(path);
+    ui.Codec codec = await ui.instantiateImageCodec(data.buffer.asUint8List(),
+        targetWidth: width);
+    ui.FrameInfo fi = await codec.getNextFrame();
+    return (await fi.image.toByteData(format: ui.ImageByteFormat.png))!
+        .buffer
+        .asUint8List();
+  }
+
+  void setCustomMarkerIcon() async {
+    Uint8List markerIcon = await getBytesFromAsset('assets/person.png', 100);
+
+    // BitmapDescriptor.fromBytes(markerIcon);
+    currentLocationIcon = BitmapDescriptor.fromBytes(markerIcon);
+  }
+
+  void setCustomSucursalIcon() async {
+    Uint8List sucursalIcon =
+        await getBytesFromAsset('assets/beer-icon.png', 50);
+    allSucursalsIcon = BitmapDescriptor.fromBytes(sucursalIcon);
+  }
+
+  // Custom icon end
 
   @override
   void initState() {
     super.initState();
+    setCustomSucursalIcon();
+    setCustomMarkerIcon();
+    getBranches();
+    setSucursals();
+    _setPolygon();
   }
 
   Future<BitmapDescriptor> _createMarkerImageFromAsset(
@@ -72,21 +111,28 @@ class _MyHomePageState extends State<MyHomePage> {
     return resizedBitmapDescriptor;
   }
 
-  void _setMarker(LatLng point) async {
-    final BitmapDescriptor markerImage =
-        await _createMarkerImageFromAsset(context);
+  void _setMarker(LatLng point, BitmapDescriptor icon) {
     setState(() {
+      final String markerIdVal = 'marker_$_markerIdCounter';
+      _markerIdCounter++;
       _markers.add(
         Marker(
-          markerId: const MarkerId('marker'),
+          markerId: MarkerId(markerIdVal),
           position: point,
-          icon: markerImage,
+          icon: icon,
         ),
       );
     });
   }
 
-  void _setPolygon() {
+  void _setPolygon() async {
+    await setSucursals();
+    _polygonLatLngs.addAll(<LatLng>[
+      const LatLng(20.9127915, -100.7445553),
+      const LatLng(21.1516268, -100.9481036),
+      const LatLng(21.1234883, -101.6927539),
+      const LatLng(20.5280556, -100.8176046)
+    ]);
     final String polygonIdVal = 'polygon_$_polygonIdCounter';
     _polygonIdCounter++;
     _polygons.add(Polygon(
@@ -95,6 +141,47 @@ class _MyHomePageState extends State<MyHomePage> {
       strokeWidth: 2,
       fillColor: Colors.transparent,
     ));
+  }
+
+  List<Map<dynamic, dynamic>> branches = [
+    <dynamic, dynamic>{},
+    <dynamic, dynamic>{}
+  ];
+  // gets all branches from the local API
+  getBranches() async {
+    //const response = await fetch("http://ip:4005/api/branches/all");
+    var response =
+        await http.get(Uri.parse("http://192.168.1.68:4005/api/branches/all"));
+    var jsonData = await response.body;
+    var json = convert.jsonDecode(jsonData);
+    print("JSON: ${json['features']}");
+
+    branches = json['features'].cast<Map<dynamic, dynamic>>().toList();
+  }
+
+  // sets all the markers from the API
+  setSucursals() async {
+    await getBranches();
+    for (var i = 0; i < branches.length; i++) {
+      LatLng origin;
+      List<double> destination;
+      var request = {
+        origin = LatLng(10.1, -101.2),
+        destination = [
+          double.parse(branches[i]['geometry']['coordinates'][1]),
+          double.parse(branches[i]['geometry']['coordinates'][0])
+        ],
+        // 'origin': LatLng(10.1, -101.2),
+        // 'destination': [double.parse(branches[i]['geometry']['coordinates'][1]) , double.parse(branches[i]['geometry']['coordinates'][0])],
+        // 'travelMode': webService.TravelMode.driving,
+        // 'unitSystem': Unit.imperial
+      };
+
+      print(destination);
+      //_polygonLatLngs.add(LatLng(destination[0], destination[1]));
+      // sets all the marks from the personal API
+      _setMarker(LatLng(destination[0], destination[1]), allSucursalsIcon);
+    }
   }
 
   bool _showInfoBox = false;
@@ -246,6 +333,6 @@ class _MyHomePageState extends State<MyHomePage> {
     controller.animateCamera(CameraUpdate.newCameraPosition(
       kPlaceCameraPosition,
     ));
-    _setMarker(LatLng(lat, lng));
+    _setMarker(LatLng(lat, lng), currentLocationIcon);
   }
 }
