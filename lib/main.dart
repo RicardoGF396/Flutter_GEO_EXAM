@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:geo_flutter_exam/location_service.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:flutter/services.dart';
@@ -42,6 +43,13 @@ class _MyHomePageState extends State<MyHomePage> {
   final List<LatLng> _polygonLatLngs = <LatLng>[];
   int _markerIdCounter = 1;
   int _polygonIdCounter = 1;
+
+  //int _polygonIdCounterRoute = 1;
+  //int _markerIdCounterRoute = 1;
+  int _polylineIdCounter = 1;
+  final Set<Polyline> _polylines = <Polyline>{};
+
+
   static const CameraPosition _kOrigin = CameraPosition(
     //target: LatLng(21.1220208, -101.683534),
     //zoom: 12,
@@ -151,7 +159,7 @@ class _MyHomePageState extends State<MyHomePage> {
   getBranches() async {
     //const response = await fetch("http://ip:4005/api/branches/all");
     var response =
-        await http.get(Uri.parse("http://192.168.1.68:4005/api/branches/all"));
+        await http.get(Uri.parse("http://172.18.69.151:4005/api/branches/all"));
     var jsonData = await response.body;
     var json = convert.jsonDecode(jsonData);
     print("JSON: ${json['features']}");
@@ -185,6 +193,23 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   bool _showInfoBox = false;
+  double latitude = 0;
+  double longitude = 0;
+
+    void _setPolyline(List<PointLatLng> points) {
+    final String polylineIdVal = 'polyline_$_polylineIdCounter';
+      _polylineIdCounter++;
+      _polylines.add(
+        Polyline(
+          polylineId: PolylineId(polylineIdVal),
+          width: 2,
+          color: Colors.blue,
+          points: points.map(
+            (point)=> LatLng(point.latitude, point.longitude)
+            ).toList(),
+        ),
+      );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -268,6 +293,18 @@ class _MyHomePageState extends State<MyHomePage> {
                           var place = await LocationService()
                               .getPlace(_searchController.text);
                           _goToPlace(place);
+                          var origin = latitude.toString() + ',' + longitude.toString();
+                          var directions = await LocationService().getDirections(origin, '20.9127915, -100.7445553');
+                          _goToPlaces(
+                            directions['start_location']['lat'], 
+                            directions['start_location']['lng'],
+                            directions['bounds_ne'],
+                            directions['bounds_sw']
+                          );
+                          _setPolyline(directions['polyline_decoded']);
+                          /* _setMarker(LatLng(directions['end_location']['lat'], 
+                            directions['end_location']['lng']), 
+                            BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue)); */
                         },
                         style: ElevatedButton.styleFrom(
                           primary: Colors.black,
@@ -327,6 +364,8 @@ class _MyHomePageState extends State<MyHomePage> {
   Future<void> _goToPlace(Map<String, dynamic> place) async {
     final double lat = place['geometry']['location']['lat'];
     final double lng = place['geometry']['location']['lng'];
+    latitude = lat;
+    longitude = lng;
     final GoogleMapController controller = await _controller.future;
     CameraPosition kPlaceCameraPosition =
         CameraPosition(target: LatLng(lat, lng), zoom: 12);
@@ -335,4 +374,33 @@ class _MyHomePageState extends State<MyHomePage> {
     ));
     _setMarker(LatLng(lat, lng), currentLocationIcon);
   }
+
+  Future<void> _goToPlaces(
+    // Map<String, dynamic> place
+    double lat,
+    double lng,
+    Map<String, dynamic> boundsNe,
+    Map<String, dynamic> boundsSw,
+    ) async {
+    // final double lat = place['geometry']['location']['lat'];
+    // final double lng = place['geometry']['location']['lng'];
+    final GoogleMapController controller = await _controller.future;
+    CameraPosition kPlaceCameraPosition = CameraPosition(
+      target: LatLng(lat, lng),
+      zoom: 12);
+    controller.animateCamera(CameraUpdate.newCameraPosition(
+      kPlaceCameraPosition,
+    ));
+    controller.animateCamera(
+      CameraUpdate.newLatLngBounds(
+        LatLngBounds(
+          southwest: LatLng(boundsSw['lat'], boundsSw['lng']), 
+          northeast: LatLng(boundsNe['lat'], boundsNe['lng'])), 
+          25
+        )
+    );
+    _setMarker(LatLng(lat, lng), BitmapDescriptor.defaultMarker);
+  }
+
 }
+
