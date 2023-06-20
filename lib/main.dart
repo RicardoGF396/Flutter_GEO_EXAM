@@ -167,7 +167,7 @@ class _MyHomePageState extends State<MyHomePage> {
     await setCustomSucursalIcon();
     await setCustomMarkerIcon();
     var response =
-        await http.get(Uri.parse("http://192.168.100.6:4005/api/branches/all"));
+        await http.get(Uri.parse("http://172.18.68.126:4005/api/branches/all"));
     var jsonData = await response.body;
     var json = convert.jsonDecode(jsonData);
     print("JSON: ${json['features']}");
@@ -276,7 +276,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
     // ============================== ORDENAR MIS SUCURSALES ==============================
     var places =
-        await http.get(Uri.parse("http://192.168.100.6:4005/api/branches/all"));
+        await http.get(Uri.parse("http://172.18.68.126:4005/api/branches/all"));
     var jsonData = await places.body;
     //Se tienen todas las sucursales
     var jsonComplete = convert.jsonDecode(jsonData);
@@ -486,7 +486,7 @@ class _MyHomePageState extends State<MyHomePage> {
   double latitude = 0;
   double longitude = 0;
   final String key =
-      ""; //AQUI PON TU API KEY
+      "AIzaSyDFanujpwtMpdwzOXmQ-3ygJrx6aXJs0Ss"; //AQUI PON TU API KEY
   List<String> finalDuration = [];
 
   void _setPolyline(List<PointLatLng> points) {
@@ -502,6 +502,17 @@ class _MyHomePageState extends State<MyHomePage> {
             .toList(),
       ),
     );
+  }
+
+  void clearRoutesAndCamera() {
+    finalDuration = [];
+    setState(() {
+      _polylines.clear();
+
+      _controller.future.then((controller) {
+        controller.animateCamera(CameraUpdate.newCameraPosition(_kOrigin));
+      });
+    });
   }
 
   @override
@@ -581,6 +592,8 @@ class _MyHomePageState extends State<MyHomePage> {
                           var place = await LocationService()
                               .getPlace(_searchController.text);
                           _goToPlace(place);
+                          //Limpianos todas lineas y nos regresamos a la vista original
+                          clearRoutesAndCamera();
                           //Pintar rutas
                           await setDirectionsRoutes();
                           //Mostrar alerta
@@ -653,6 +666,8 @@ class _MyHomePageState extends State<MyHomePage> {
       kPlaceCameraPosition,
     ));
     _setMarker(LatLng(lat, lng), currentLocationIcon);
+
+
   }
 
   Future<void> _goToPlaces(
