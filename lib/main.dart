@@ -10,6 +10,8 @@ import 'dart:ui' as ui;
 
 void main() => runApp(const MyApp());
 
+Color _polygonFillColor = Color.fromRGBO(18, 99, 18, 0.494); // Color inicial
+
 class MyApp extends StatelessWidget {
   const MyApp({Key? key}) : super(key: key);
 
@@ -78,7 +80,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
   Future<void> setCustomSucursalIcon() async {
     Uint8List sucursalIcon =
-        await getBytesFromAsset('assets/beer-icon.png', 50);
+        await getBytesFromAsset('assets/beer-icon.png', 80);
     allSucursalsIcon = BitmapDescriptor.fromBytes(sucursalIcon);
   }
 
@@ -148,6 +150,12 @@ class _MyHomePageState extends State<MyHomePage> {
       fillColor: Color.fromRGBO(
           18, 99, 18, 0.066), // Cambio realizado: se establece el color verde
     ));
+  }
+
+  void _changePolygonColor() {
+    setState(() {
+      _polygonFillColor = Colors.transparent; // Cambiar a color transparente
+    });
   }
 
   List<Map<dynamic, dynamic>> branches = [
