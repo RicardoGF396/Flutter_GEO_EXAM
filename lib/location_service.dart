@@ -4,7 +4,8 @@ import 'package:http/http.dart' as http;
 import 'dart:convert' as convert;
 
 class LocationService {
-  final String key =""; //AQUI PON TU API KEY
+  final String key =
+      "AIzaSyA9-aWmLxKr-9NQHWD7CdYfHa9QutaGd5A"; //AQUI PON TU API KEY
   Future<String> getPlaceId(String input) async {
     final String url =
         "https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input=$input&inputtype=textquery&key=$key";
@@ -41,7 +42,7 @@ class LocationService {
       'polyline_decoded': PolylinePoints().decodePolyline(json['routes'][0]
           ['overview_polyline']['points']) //flutter_polyline_points: ^1.0.0
     };
-    print(results);
+    //print(results);
     return results;
   }
 }

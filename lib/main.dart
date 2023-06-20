@@ -9,6 +9,8 @@ import 'dart:ui' as ui;
 
 void main() => runApp(const MyApp());
 
+Color _polygonFillColor = Color.fromRGBO(18, 99, 18, 0.494); // Color inicial
+
 class MyApp extends StatelessWidget {
   const MyApp({Key? key}) : super(key: key);
 
@@ -63,16 +65,16 @@ class _MyHomePageState extends State<MyHomePage> {
         .asUint8List();
   }
 
-  Future <void> setCustomMarkerIcon() async {
-    Uint8List markerIcon = await getBytesFromAsset('assets/person.png', 100);
+  Future<void> setCustomMarkerIcon() async {
+    Uint8List markerIcon = await getBytesFromAsset('assets/person.png', 250);
 
     // BitmapDescriptor.fromBytes(markerIcon);
     currentLocationIcon = BitmapDescriptor.fromBytes(markerIcon);
   }
 
-  Future <void> setCustomSucursalIcon() async {
+  Future<void> setCustomSucursalIcon() async {
     Uint8List sucursalIcon =
-        await getBytesFromAsset('assets/beer-icon.png', 50);
+        await getBytesFromAsset('assets/beer-icon.png', 80);
     allSucursalsIcon = BitmapDescriptor.fromBytes(sucursalIcon);
   }
 
@@ -135,13 +137,20 @@ class _MyHomePageState extends State<MyHomePage> {
     ]);
     final String polygonIdVal = 'polygon_$_polygonIdCounter';
     //_polygonIdCounter++;
-   _polygons.add(Polygon(
-    polygonId: PolygonId(polygonIdVal),
-    points: _polygonLatLngs,
-    strokeWidth: 2,
-     fillColor: Color.fromRGBO(18, 99, 18, 0.494), // Cambio realizado: se establece el color verde
-  ));
-}
+    _polygons.add(Polygon(
+      polygonId: PolygonId(polygonIdVal),
+      points: _polygonLatLngs,
+      strokeWidth: 2,
+      fillColor: _polygonFillColor,
+      // Cambio realizado: se establece el color verde
+    ));
+  }
+
+  void _changePolygonColor() {
+    setState(() {
+      _polygonFillColor = Colors.transparent; // Cambiar a color transparente
+    });
+  }
 
   List<Map<dynamic, dynamic>> branches = [
     <dynamic, dynamic>{},
