@@ -211,15 +211,17 @@ class _MyHomePageState extends State<MyHomePage> {
 
     return sortedDestinations;
   }
+
   // Este se va a usar para cuando entre al else debido a que se mandan de diferente manera las coordenadas
   Future<List> getDirectionsForPlaces(
       String origin, List<dynamic> branches) async {
     final destinations = [];
     print(branches);
     await Future.forEach(branches, (branch) async {
-      var arrDestination = branch['coordinates'];
+      var latPlace = branch['end_location']["lat"];
+      var lngPlace = branch['end_location']["lng"];
       final String url =
-          "https://maps.googleapis.com/maps/api/directions/json?origin=$origin&destination=$arrDestination&key=$key";
+          "https://maps.googleapis.com/maps/api/directions/json?origin=$origin&destination=$latPlace,$lngPlace&key=$key";
       var response =
           await http.get(Uri.parse(url)).timeout(Duration(minutes: 5));
       var json = convert.jsonDecode(response.body);
@@ -294,8 +296,6 @@ class _MyHomePageState extends State<MyHomePage> {
     // ============================== OBTENER LA RUTA MÁS CERCANA ==============================
     // Lista de lugares ordenados
     final sortedDestinations = await getDirectionsForBranches(origin, branches);
-    print("SORTEDDDDDDDDDDDDDDDDDDDDDDDD");
-    print(sortedDestinations);
     final destinationsToRemove = List<dynamic>.from(sortedDestinations);
     var isOriginalOrigin = true;
     // Necesito revisar primero que es el origen por defecto
@@ -303,7 +303,7 @@ class _MyHomePageState extends State<MyHomePage> {
       if (isOriginalOrigin) {
         var currentLat = sortedDestinations[0]['end_location']['lat'];
         var currentLng = sortedDestinations[0]['end_location']['lng'];
-
+        finalDuration.add(sortedDestinations[0]['duration']);
         //Aquí se ejecuta la función para pintar la ruta
         var directions = await LocationService()
             .getDirections(origin, '$currentLat,$currentLng');
@@ -315,12 +315,13 @@ class _MyHomePageState extends State<MyHomePage> {
             directions['bounds_sw']);
         _setPolyline(directions['polyline_decoded']);
         isOriginalOrigin = false;
-        
       } else {
         final placeLat = destinationsToRemove[0]['end_location']['lat'];
         final placeLng = destinationsToRemove[0]['end_location']['lng'];
+        finalDuration.add(destinationsToRemove[0]['duration']);
         destinationsToRemove.removeAt(0);
-        var nextPlace = await getDirectionsForBranches('$placeLat,$placeLng', destinationsToRemove);
+        var nextPlace = await getDirectionsForPlaces(
+            '$placeLat,$placeLng', destinationsToRemove);
 
         var nextLat = nextPlace[0]['end_location']['lat'];
         var nextLng = nextPlace[0]['end_location']['lng'];
@@ -338,6 +339,116 @@ class _MyHomePageState extends State<MyHomePage> {
         isOriginalOrigin = false;
       }
     }
+
+    //Pinta del último lugar hacia el origen
+    var finalPlace = List<dynamic>.from(destinationsToRemove);
+    final lastPlace = await getDirectionsForPlaces(origin, finalPlace);
+    var originLastPlaceLat = lastPlace[0]['end_location']['lat'];
+    var originLastPlaceLng = lastPlace[0]['end_location']['lng'];
+    finalDuration.add(finalPlace[0]['duration']);
+
+    var directions = await LocationService()
+        .getDirections('$originLastPlaceLat,$originLastPlaceLng', origin);
+    //_goToPlaces solo mueve la cámara
+    _goToPlaces(
+        directions['start_location']['lat'],
+        directions['start_location']['lng'],
+        directions['bounds_ne'],
+        directions['bounds_sw']);
+    _setPolyline(directions['polyline_decoded']);
+    isOriginalOrigin = false;
+  }
+
+  void showRoutesDialog(List<String> finalDuration) {
+    String totalTime = calculateTotalTime(finalDuration);
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Rutas'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (int i = 0; i < finalDuration.length; i++)
+                Text('Ruta ${i + 1}: ${finalDuration[i]}'),
+              SizedBox(height: 20),
+              Text('Tiempo total: $totalTime'),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text('Cerrar'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  String calculateTotalTime(List<String> finalDuration) {
+    int totalMinutes = 0;
+
+    for (String duration in finalDuration) {
+      int minutes = parseDuration(duration);
+      totalMinutes += minutes;
+    }
+
+    int hours = totalMinutes ~/ 60;
+    int minutes = totalMinutes % 60;
+
+    return '${hours}h ${minutes}m';
+  }
+
+  int parseDuration(String duration) {
+    List<String> parts = duration.split(',');
+
+    int totalMinutes = 0;
+
+    for (String part in parts) {
+      String trimmedPart = part.trim();
+
+      if (trimmedPart.contains('hour')) {
+        List<String> hoursAndMinutes = trimmedPart.split('hour');
+
+        String hoursStr = hoursAndMinutes[0].trim();
+        if (hoursStr.isNotEmpty && hoursStr.contains(RegExp(r'[0-9]'))) {
+          totalMinutes += int.parse(hoursStr) * 60;
+        }
+
+        if (hoursAndMinutes.length > 1) {
+          String minutesStr =
+              hoursAndMinutes[1].replaceAll(RegExp(r'[^0-9]'), '').trim();
+          if (minutesStr.isNotEmpty) {
+            totalMinutes += int.parse(minutesStr);
+          }
+        }
+      } else if (trimmedPart.contains('hours')) {
+        List<String> hoursAndMinutes = trimmedPart.split('hours');
+
+        String hoursStr = hoursAndMinutes[0].trim();
+        if (hoursStr.isNotEmpty && hoursStr.contains(RegExp(r'[0-9]'))) {
+          totalMinutes += int.parse(hoursStr) * 60;
+        }
+
+        if (hoursAndMinutes.length > 1) {
+          String minutesStr =
+              hoursAndMinutes[1].replaceAll(RegExp(r'[^0-9]'), '').trim();
+          if (minutesStr.isNotEmpty) {
+            totalMinutes += int.parse(minutesStr);
+          }
+        }
+      } else if (trimmedPart.contains('mins')) {
+        String minutesStr =
+            trimmedPart.replaceAll(RegExp(r'[^0-9]'), '').trim();
+        if (minutesStr.isNotEmpty) {
+          totalMinutes += int.parse(minutesStr);
+        }
+      }
+    }
+
+    return totalMinutes;
   }
 
   // sets all the markers from the API
@@ -368,6 +479,7 @@ class _MyHomePageState extends State<MyHomePage> {
   double longitude = 0;
   final String key =
       "AIzaSyDFanujpwtMpdwzOXmQ-3ygJrx6aXJs0Ss"; //AQUI PON TU API KEY
+  List<String> finalDuration = [];
 
   void _setPolyline(List<PointLatLng> points) {
     final String polylineIdVal = 'polyline_$_polylineIdCounter';
@@ -461,7 +573,10 @@ class _MyHomePageState extends State<MyHomePage> {
                           var place = await LocationService()
                               .getPlace(_searchController.text);
                           _goToPlace(place);
-                          setDirectionsRoutes();
+                          //Pintar rutas
+                          await setDirectionsRoutes();
+                          //Mostrar alerta
+                          showRoutesDialog(finalDuration);
                         },
                         style: ElevatedButton.styleFrom(
                           primary: Colors.black,
