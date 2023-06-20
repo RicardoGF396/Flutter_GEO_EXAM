@@ -486,7 +486,7 @@ class _MyHomePageState extends State<MyHomePage> {
   double latitude = 0;
   double longitude = 0;
   final String key =
-      "AIzaSyDFanujpwtMpdwzOXmQ-3ygJrx6aXJs0Ss"; //AQUI PON TU API KEY
+      ""; //AQUI PON TU API KEY
   List<String> finalDuration = [];
 
   void _setPolyline(List<PointLatLng> points) {
