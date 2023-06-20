@@ -43,12 +43,10 @@ class _MyHomePageState extends State<MyHomePage> {
   final List<LatLng> _polygonLatLngs = <LatLng>[];
   int _markerIdCounter = 1;
   int _polygonIdCounter = 1;
-
-  //int _polygonIdCounterRoute = 1;
-  //int _markerIdCounterRoute = 1;
   int _polylineIdCounter = 1;
   final Set<Polyline> _polylines = <Polyline>{};
 
+  /* Variables globales para las rutas */
 
   static const CameraPosition _kOrigin = CameraPosition(
     //target: LatLng(21.1220208, -101.683534),
@@ -71,14 +69,14 @@ class _MyHomePageState extends State<MyHomePage> {
         .asUint8List();
   }
 
-  void setCustomMarkerIcon() async {
+  Future<void> setCustomMarkerIcon() async {
     Uint8List markerIcon = await getBytesFromAsset('assets/person.png', 100);
 
     // BitmapDescriptor.fromBytes(markerIcon);
     currentLocationIcon = BitmapDescriptor.fromBytes(markerIcon);
   }
 
-  void setCustomSucursalIcon() async {
+  Future<void> setCustomSucursalIcon() async {
     Uint8List sucursalIcon =
         await getBytesFromAsset('assets/beer-icon.png', 50);
     allSucursalsIcon = BitmapDescriptor.fromBytes(sucursalIcon);
@@ -136,18 +134,19 @@ class _MyHomePageState extends State<MyHomePage> {
   void _setPolygon() async {
     await setSucursals();
     _polygonLatLngs.addAll(<LatLng>[
-      const LatLng(20.9127915, -100.7445553),
-      const LatLng(21.1516268, -100.9481036),
-      const LatLng(21.1234883, -101.6927539),
-      const LatLng(20.5280556, -100.8176046)
+      const LatLng(20.894454, -100.678923),
+      const LatLng(21.243964, -100.864543),
+      const LatLng(21.188806, -101.791105),
+      const LatLng(20.402177, -100.765260)
     ]);
     final String polygonIdVal = 'polygon_$_polygonIdCounter';
-    _polygonIdCounter++;
+    //_polygonIdCounter++;
     _polygons.add(Polygon(
       polygonId: PolygonId(polygonIdVal),
       points: _polygonLatLngs,
       strokeWidth: 2,
-      fillColor: Colors.transparent,
+      fillColor: Color.fromRGBO(
+          18, 99, 18, 0.066), // Cambio realizado: se establece el color verde
     ));
   }
 
@@ -157,14 +156,188 @@ class _MyHomePageState extends State<MyHomePage> {
   ];
   // gets all branches from the local API
   getBranches() async {
-    //const response = await fetch("http://ip:4005/api/branches/all");
+    await setCustomSucursalIcon();
+    await setCustomMarkerIcon();
     var response =
-        await http.get(Uri.parse("http://172.18.69.151:4005/api/branches/all"));
+        await http.get(Uri.parse("http://192.168.100.6:4005/api/branches/all"));
     var jsonData = await response.body;
     var json = convert.jsonDecode(jsonData);
     print("JSON: ${json['features']}");
 
     branches = json['features'].cast<Map<dynamic, dynamic>>().toList();
+  }
+
+  //Este se va a usar cuando va del origen que ingresa el usuario hacia la primera sucursal
+  Future<List> getDirectionsForBranches(
+      String origin, List<dynamic> branches) async {
+    final destinations = [];
+    print(branches);
+    await Future.forEach(branches, (branch) async {
+      var arrDestination = branch['coordinates'];
+      final String url =
+          "https://maps.googleapis.com/maps/api/directions/json?origin=$origin&destination=$arrDestination&key=$key";
+      var response =
+          await http.get(Uri.parse(url)).timeout(Duration(minutes: 5));
+      var json = convert.jsonDecode(response.body);
+      var distanceText = json['routes'][0]['legs'][0]['distance']['text'];
+      var duration = json['routes'][0]['legs'][0]['duration']['text'];
+      var bounds_ne = json['routes'][0]['bounds']['northeast'];
+      var bounds_sw = json['routes'][0]['bounds']['southwest'];
+      var start_location = json['routes'][0]['legs'][0]['start_location'];
+      var end_location = json['routes'][0]['legs'][0]['end_location'];
+      var polyline = json['routes'][0]['overview_polyline']['points'];
+      var polyline_decoded = PolylinePoints()
+          .decodePolyline(json['routes'][0]['overview_polyline']['points']);
+
+      destinations.add({
+        'distanceText': distanceText,
+        'duration': duration,
+        'bounds_ne': bounds_ne,
+        'bounds_sw': bounds_sw,
+        'start_location': start_location,
+        'end_location': end_location,
+        'polyline': polyline,
+        'polyline_decoded': polyline_decoded
+      });
+    });
+
+    List<dynamic> sortedDestinations = destinations;
+
+    sortedDestinations.sort((a, b) {
+      String distanceA = a['distanceText'];
+      String distanceB = b['distanceText'];
+      return _parseDistance(distanceA).compareTo(_parseDistance(distanceB));
+    });
+
+    return sortedDestinations;
+  }
+  // Este se va a usar para cuando entre al else debido a que se mandan de diferente manera las coordenadas
+  Future<List> getDirectionsForPlaces(
+      String origin, List<dynamic> branches) async {
+    final destinations = [];
+    print(branches);
+    await Future.forEach(branches, (branch) async {
+      var arrDestination = branch['coordinates'];
+      final String url =
+          "https://maps.googleapis.com/maps/api/directions/json?origin=$origin&destination=$arrDestination&key=$key";
+      var response =
+          await http.get(Uri.parse(url)).timeout(Duration(minutes: 5));
+      var json = convert.jsonDecode(response.body);
+      var distanceText = json['routes'][0]['legs'][0]['distance']['text'];
+      var duration = json['routes'][0]['legs'][0]['duration']['text'];
+      var bounds_ne = json['routes'][0]['bounds']['northeast'];
+      var bounds_sw = json['routes'][0]['bounds']['southwest'];
+      var start_location = json['routes'][0]['legs'][0]['start_location'];
+      var end_location = json['routes'][0]['legs'][0]['end_location'];
+      var polyline = json['routes'][0]['overview_polyline']['points'];
+      var polyline_decoded = PolylinePoints()
+          .decodePolyline(json['routes'][0]['overview_polyline']['points']);
+
+      destinations.add({
+        'distanceText': distanceText,
+        'duration': duration,
+        'bounds_ne': bounds_ne,
+        'bounds_sw': bounds_sw,
+        'start_location': start_location,
+        'end_location': end_location,
+        'polyline': polyline,
+        'polyline_decoded': polyline_decoded
+      });
+    });
+
+    List<dynamic> sortedDestinations = destinations;
+
+    sortedDestinations.sort((a, b) {
+      String distanceA = a['distanceText'];
+      String distanceB = b['distanceText'];
+      return _parseDistance(distanceA).compareTo(_parseDistance(distanceB));
+    });
+
+    return sortedDestinations;
+  }
+
+  double _parseDistance(String distanceText) {
+    final distance = double.tryParse(distanceText.split(' ')[0]);
+    return distance ?? 0.0;
+  }
+
+  setDirectionsRoutes() async {
+    var origin = latitude.toString() + ',' + longitude.toString();
+
+    // ============================== ORDENAR MIS SUCURSALES ==============================
+    var places =
+        await http.get(Uri.parse("http://192.168.100.6:4005/api/branches/all"));
+    var jsonData = await places.body;
+    //Se tienen todas las sucursales
+    var jsonComplete = convert.jsonDecode(jsonData);
+    //Aquí se guardan todos los lugares solo con su nombre y coordenadas
+    List<Map<String, dynamic>> branches = [];
+
+    for (var feature in jsonComplete['features']) {
+      var properties = feature['properties'];
+      var geometry = feature['geometry'];
+
+      String name = properties['name'];
+      List<dynamic> coordinates = geometry['coordinates'];
+
+      double latitude = double.parse(coordinates[1].toString());
+      double longitude = double.parse(coordinates[0].toString());
+
+      branches.add({
+        'name': name,
+        'coordinates': '$latitude,$longitude',
+      });
+    }
+
+    // ===================================================================================================
+
+    // ============================== OBTENER LA RUTA MÁS CERCANA ==============================
+    // Lista de lugares ordenados
+    final sortedDestinations = await getDirectionsForBranches(origin, branches);
+    print("SORTEDDDDDDDDDDDDDDDDDDDDDDDD");
+    print(sortedDestinations);
+    final destinationsToRemove = List<dynamic>.from(sortedDestinations);
+    var isOriginalOrigin = true;
+    // Necesito revisar primero que es el origen por defecto
+    for (var i = 0; i < sortedDestinations.length; i++) {
+      if (isOriginalOrigin) {
+        var currentLat = sortedDestinations[0]['end_location']['lat'];
+        var currentLng = sortedDestinations[0]['end_location']['lng'];
+
+        //Aquí se ejecuta la función para pintar la ruta
+        var directions = await LocationService()
+            .getDirections(origin, '$currentLat,$currentLng');
+        //_goToPlaces solo mueve la cámara
+        _goToPlaces(
+            directions['start_location']['lat'],
+            directions['start_location']['lng'],
+            directions['bounds_ne'],
+            directions['bounds_sw']);
+        _setPolyline(directions['polyline_decoded']);
+        isOriginalOrigin = false;
+        
+      } else {
+        final placeLat = destinationsToRemove[0]['end_location']['lat'];
+        final placeLng = destinationsToRemove[0]['end_location']['lng'];
+        destinationsToRemove.removeAt(0);
+        var nextPlace = await getDirectionsForBranches('$placeLat,$placeLng', destinationsToRemove);
+
+        var nextLat = nextPlace[0]['end_location']['lat'];
+        var nextLng = nextPlace[0]['end_location']['lng'];
+
+        //Aquí se ejecuta la función para pintar la ruta
+        var directions = await LocationService()
+            .getDirections('$placeLat,$placeLng', '$nextLat,$nextLng');
+        //_goToPlaces solo mueve la cámara
+        _goToPlaces(
+            directions['start_location']['lat'],
+            directions['start_location']['lng'],
+            directions['bounds_ne'],
+            directions['bounds_sw']);
+        _setPolyline(directions['polyline_decoded']);
+        isOriginalOrigin = false;
+      }
+    }
   }
 
   // sets all the markers from the API
@@ -184,8 +357,6 @@ class _MyHomePageState extends State<MyHomePage> {
         // 'travelMode': webService.TravelMode.driving,
         // 'unitSystem': Unit.imperial
       };
-
-      print(destination);
       //_polygonLatLngs.add(LatLng(destination[0], destination[1]));
       // sets all the marks from the personal API
       _setMarker(LatLng(destination[0], destination[1]), allSucursalsIcon);
@@ -195,20 +366,22 @@ class _MyHomePageState extends State<MyHomePage> {
   bool _showInfoBox = false;
   double latitude = 0;
   double longitude = 0;
+  final String key =
+      "AIzaSyDFanujpwtMpdwzOXmQ-3ygJrx6aXJs0Ss"; //AQUI PON TU API KEY
 
-    void _setPolyline(List<PointLatLng> points) {
+  void _setPolyline(List<PointLatLng> points) {
     final String polylineIdVal = 'polyline_$_polylineIdCounter';
-      _polylineIdCounter++;
-      _polylines.add(
-        Polyline(
-          polylineId: PolylineId(polylineIdVal),
-          width: 2,
-          color: Colors.blue,
-          points: points.map(
-            (point)=> LatLng(point.latitude, point.longitude)
-            ).toList(),
-        ),
-      );
+    _polylineIdCounter++;
+    _polylines.add(
+      Polyline(
+        polylineId: PolylineId(polylineIdVal),
+        width: 2,
+        color: Colors.blue,
+        points: points
+            .map((point) => LatLng(point.latitude, point.longitude))
+            .toList(),
+      ),
+    );
   }
 
   @override
@@ -220,15 +393,10 @@ class _MyHomePageState extends State<MyHomePage> {
             mapType: MapType.normal,
             markers: _markers,
             polygons: _polygons,
+            polylines: _polylines,
             initialCameraPosition: _kOrigin,
             onMapCreated: (GoogleMapController controller) {
               _controller.complete(controller);
-            },
-            onTap: (point) {
-              setState(() {
-                _polygonLatLngs.add(point);
-                _setPolygon();
-              });
             },
           ),
           Positioned(
@@ -293,18 +461,7 @@ class _MyHomePageState extends State<MyHomePage> {
                           var place = await LocationService()
                               .getPlace(_searchController.text);
                           _goToPlace(place);
-                          var origin = latitude.toString() + ',' + longitude.toString();
-                          var directions = await LocationService().getDirections(origin, '20.9127915, -100.7445553');
-                          _goToPlaces(
-                            directions['start_location']['lat'], 
-                            directions['start_location']['lng'],
-                            directions['bounds_ne'],
-                            directions['bounds_sw']
-                          );
-                          _setPolyline(directions['polyline_decoded']);
-                          /* _setMarker(LatLng(directions['end_location']['lat'], 
-                            directions['end_location']['lng']), 
-                            BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue)); */
+                          setDirectionsRoutes();
                         },
                         style: ElevatedButton.styleFrom(
                           primary: Colors.black,
@@ -335,8 +492,8 @@ class _MyHomePageState extends State<MyHomePage> {
                     ),
                   ],
                 ),
-                padding: EdgeInsets.all(10),
-                child: Column(
+                padding: const EdgeInsets.all(10),
+                child: const Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
@@ -381,26 +538,20 @@ class _MyHomePageState extends State<MyHomePage> {
     double lng,
     Map<String, dynamic> boundsNe,
     Map<String, dynamic> boundsSw,
-    ) async {
+  ) async {
     // final double lat = place['geometry']['location']['lat'];
     // final double lng = place['geometry']['location']['lng'];
     final GoogleMapController controller = await _controller.future;
-    CameraPosition kPlaceCameraPosition = CameraPosition(
-      target: LatLng(lat, lng),
-      zoom: 12);
+    CameraPosition kPlaceCameraPosition =
+        CameraPosition(target: LatLng(lat, lng), zoom: 12);
     controller.animateCamera(CameraUpdate.newCameraPosition(
       kPlaceCameraPosition,
     ));
-    controller.animateCamera(
-      CameraUpdate.newLatLngBounds(
+    controller.animateCamera(CameraUpdate.newLatLngBounds(
         LatLngBounds(
-          southwest: LatLng(boundsSw['lat'], boundsSw['lng']), 
-          northeast: LatLng(boundsNe['lat'], boundsNe['lng'])), 
-          25
-        )
-    );
-    _setMarker(LatLng(lat, lng), BitmapDescriptor.defaultMarker);
+            southwest: LatLng(boundsSw['lat'], boundsSw['lng']),
+            northeast: LatLng(boundsNe['lat'], boundsNe['lng'])),
+        25));
+    _setMarker(LatLng(lat, lng), currentLocationIcon);
   }
-
 }
-
